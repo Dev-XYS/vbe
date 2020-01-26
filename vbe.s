@@ -3,7 +3,7 @@
 	// Sector 0 (MBR)
 	//
 	//////////////////////////////////////////////////
-	
+
 	.code16
 
 	// set graphics segment (always using %gs)
@@ -38,6 +38,9 @@
 
 	// jump to sector 2
 	ljmp $0x4000, $0x400
+
+	//////////////////////////////////////////////////
+	// begin functions
 
 write:
 	mov $0x20, %dh
@@ -90,10 +93,13 @@ clear:
 	loop .clear_loop
 	ret
 
+	// end functions
+	//////////////////////////////////////////////////
+
 	.org 0x1FE
 	.word 0xAA55
 
-	
+
 	//////////////////////////////////////////////////
 	//
 	// Sector 1 (Data)
@@ -108,7 +114,7 @@ buf:	.zero 32
 
 	.org 0x400
 
-	
+
 	//////////////////////////////////////////////////
 	//
 	// Sector 2
@@ -127,16 +133,20 @@ buf:	.zero 32
 	mov $0, %di
 	int $0x10
 
+	// get mode list address
 	mov %es:14, %ax
 	mov %ax, %bx
 	mov %es:16, %ax
 	mov %ax, %fs
 
+	// iterate over all modes in the list
 	mov $480, %di
 .mode_loop:
 	mov %fs:(%bx), %cx
 	cmp $0xFFFF, %cx
-	je .halt
+	je .mode_loop_end
+
+	// get mode information
 	mov $0x4F01, %ax
 	push %di
 	push %fs
@@ -148,6 +158,11 @@ buf:	.zero 32
 	pop %di
 	cmp $0x004F, %ax
 	jne .error
+
+	// print mode information
+	mov %cx, %ax
+	call write_hex16
+	add $10, %di
 	mov %es:0x1012, %ax
 	call write_hex16
 	mov $char_x, %si
@@ -157,9 +172,17 @@ buf:	.zero 32
 	call write_hex16
 
 	add $2, %bx
-	add $10, %di
+	add $20, %di
 	jmp .mode_loop
-	
+.mode_loop_end:
+
+	// change video mode
+	mov $0x4F02, %ax
+	mov $0x4144, %bx
+	int $0x10
+	cmp $0x004F, %ax
+	jne .error
+
 .halt:
 	hlt
 	jmp .halt
